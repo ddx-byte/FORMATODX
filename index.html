@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Plataforma Educativa - Biología Celular Interactiva (Fix)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .hidden-by-default { display: none; }
+    .card { perspective: 1000px; }
+    .card-inner {
+      position: relative; width: 240px; height: 140px;
+      text-align: center; transition: transform 0.6s;
+      transform-style: preserve-3d;
+    }
+    .card:hover .card-inner { transform: rotateY(180deg); }
+    .card-front, .card-back {
+      position: absolute; width: 100%; height: 100%;
+      backface-visibility: hidden;
+      border-radius: 0.5rem; display: flex;
+      align-items: center; justify-content: center;
+      font-weight: 500; padding: 0.75rem; box-sizing: border-box;
+    }
+    .card-front { background-color: #059669; color: white; }
+    .card-back { background-color: #b91c1c; color: white; transform: rotateY(180deg); }
+    .draggable { cursor: grab; background-color: #dbeafe; padding: 0.5rem; border-radius: 0.5rem; margin: 0.25rem; display: inline-block; user-select:none; }
+    .dropzone { border: 2px dashed #94a3b8; padding: 1rem; border-radius: 0.5rem; min-height: 50px; transition: border-color 0.25s, background-color 0.25s; }
+    .btn-file { background: #2563eb; color: white; padding: .4rem .75rem; border-radius: .4rem; cursor: pointer; }
+    pre.map { white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
+    .link-img { color: #1d4ed8; text-decoration: underline; cursor: pointer; }
+  </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+<div class="max-w-6xl mx-auto p-6">
+  <header class="mb-6">
+    <h1 class="text-3xl font-bold text-indigo-600">Plataforma Educativa — Biología Celular Interactiva</h1>
+    <p class="text-sm text-gray-600 mt-2">Recursos sobre <strong>Endomembrana</strong>, <strong>Estructuras y Procesos</strong>, y <strong>Mitocondrias y Metabolismo – Plastidios y Cloroplastos</strong>. Incluye quizzes secuenciales, glosario, flashcards, estructuras (imágenes via links), casos y actividades interactivas. Progreso guardado localmente.</p>
+
+    <nav class="mt-4 flex flex-wrap gap-2">
+      <button class="btn" data-target="home">Inicio</button>
+      <button class="btn" data-target="quiz">Quiz</button>
+      <button class="btn" data-target="gloss">Glosario</button>
+      <button class="btn" data-target="flash">Flashcards</button>
+      <button class="btn" data-target="estructuras">Estructuras</button>
+      <button class="btn" data-target="casos">Casos</button>
+      <button class="btn" data-target="interactivo">Interactivo</button>
+      <button class="btn" data-target="map">Mapas</button>
+      <button class="btn" data-target="dash">Dashboard</button>
+      <label class="btn-file ml-2">
+        Importar contenido (JSON)
+        <input id="fileInput" type="file" accept="application/json" style="display:none">
+      </label>
+      <button id="exportJSON" class="btn">Exportar contenido</button>
+    </nav>
+  </header>
+
+  <!-- Home -->
+  <section id="home" class="bg-white p-5 rounded shadow">
+    <h2 class="text-xl font-semibold mb-2">Bienvenido</h2>
+    <p class="text-sm text-gray-700">La plataforma está diseñada para estudiar y practicar contenidos clave de biología celular a partir de las prácticas de laboratorio 6→10: <strong>Identificación de células eucariotas y sanguíneas</strong>, <strong>Actividad de la membrana</strong>, <strong>Actividad lisosómica</strong>, <strong>Mitosis</strong> y <strong>Meiosis</strong>. Usa quizzes, glosario, flashcards, mapas conceptuales, casos y actividades interactivas para repasar y autoevaluarte. Importa un JSON para cargar contenido masivo.</p>
+    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="p-3 border rounded bg-green-50">
+        <h3 class="font-semibold">Contenido disponible</h3>
+        <ul class="text-sm mt-2 list-disc ml-5">
+          <li>Práctica 6 — Identificación de células eucariotas y sanguíneas (procedimientos y discusión compacta).</li>
+          <li>Práctica 7 — Actividad de membrana (ósmosis, difusión, modelos).</li>
+          <li>Práctica 8 — Actividad de los lisosomas (levadura + Paramecium).</li>
+          <li>Práctica 9 — Mitosis (Allium cepa, conteo e índices).</li>
+          <li>Práctica 10 — Meiosis (Agapanto/Alstroemeria, subfases y tetradas).</li>
+        </ul>
+      </div>
+      <div class="p-3 border rounded bg-yellow-50">
+        <h3 class="font-semibold">Cómo usar</h3>
+        <ol class="text-sm mt-2 list-decimal ml-5">
+          <li>Navega por secciones (Quiz, Glosario, Flashcards, Estructuras, Casos, Interactivo, Mapas).</li>
+          <li>En “Quiz” practica preguntas secuenciales por bloque temático.</li>
+          <li>Usa “Importar contenido (JSON)” para sustituir la base de datos por la tuya.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quiz -->
+  <section id="quiz" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Quiz (secuencial por tema)</h2>
+    <div class="flex gap-3 mb-3">
+      <button id="prevQ" class="px-3 py-1 bg-gray-500 text-white rounded">Anterior</button>
+      <button id="nextQ" class="px-3 py-1 bg-indigo-600 text-white rounded">Siguiente</button>
+      <button id="showAll" class="px-3 py-1 bg-gray-600 text-white rounded">Mostrar preguntas (JSON)</button>
+      <select id="quizTopic" class="rounded border px-2">
+        <option value="all">Todos los bloques</option>
+        <option value="pr6">Práctica 6 — Identificación</option>
+        <option value="pr7">Práctica 7 — Membrana</option>
+        <option value="pr8">Práctica 8 — Lisosomas</option>
+        <option value="pr9">Práctica 9 — Mitosis</option>
+        <option value="pr10">Práctica 10 — Meiosis</option>
+      </select>
+    </div>
+
+    <div id="quizArea">
+      <p id="qText" class="font-medium mb-2">Cargando pregunta...</p>
+      <div id="qOptions" class="space-y-2 mb-3"></div>
+      <button id="checkA" class="px-3 py-1 bg-amber-500 text-white rounded">Verificar</button>
+      <p id="qResult" class="mt-2 text-sm"></p>
+      <p class="text-xs text-gray-500 mt-2">Pregunta <span id="qNumber">0</span> de <span id="qTotal">0</span></p>
+    </div>
+
+    <details class="mt-4">
+      <summary class="cursor-pointer">Ver/Editar inventario de preguntas (JSON)</summary>
+      <textarea id="questionsJSON" style="width:100%;height:200px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="loadQuestions" class="px-3 py-1 bg-green-600 text-white rounded">Cargar preguntas desde JSON</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Glosario -->
+  <section id="gloss" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Glosario (términos técnicos)</h2>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <input id="glossSearch" placeholder="Buscar término..." class="w-full p-2 border rounded mb-3" />
+        <div id="glossList" style="max-height:420px;overflow:auto"></div>
+      </div>
+      <div>
+        <h3 class="font-semibold">Agregar/editar término</h3>
+        <input id="termInput" placeholder="Término" class="w-full p-2 border rounded mb-2"/>
+        <textarea id="defInput" placeholder="Definición" class="w-full p-2 border rounded mb-2" style="height:160px"></textarea>
+        <div class="flex gap-2">
+          <button id="addTerm" class="px-3 py-1 bg-green-600 text-white rounded">Agregar término</button>
+          <button id="clearGloss" class="px-3 py-1 bg-red-500 text-white rounded">Borrar todo</button>
+        </div>
+      </div>
+    </div>
+
+    <details class="mt-4">
+      <summary>Exportar/Importar glosario (JSON)</summary>
+      <textarea id="glossJSON" style="width:100%;height:140px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="importGloss" class="px-3 py-1 bg-blue-600 text-white rounded">Importar glosario</button>
+        <button id="exportGloss" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar glosario</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Flashcards -->
+  <section id="flash" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Flashcards (giran al hacer hover o clic)</h2>
+    <div class="flex flex-wrap gap-4" id="flashContainer" style="min-height:160px"></div>
+
+    <details class="mt-4">
+      <summary>Administrar flashcards (JSON)</summary>
+      <textarea id="flashJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="loadFlash" class="px-3 py-1 bg-green-600 text-white rounded">Cargar flashcards</button>
+        <button id="exportFlash" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar flashcards</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Estructuras -->
+  <section id="estructuras" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Estructuras: identificación (imágenes como links)</h2>
+    <p class="text-sm text-gray-700 mb-3">Haz clic en el enlace para abrir la imagen en nueva pestaña y luego elige la opción correcta.</p>
+
+    <div id="structuresArea" class="space-y-4"></div>
+
+    <details class="mt-4">
+      <summary>Administrar estructuras (JSON)</summary>
+      <textarea id="structuresJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="loadStructures" class="px-3 py-1 bg-green-600 text-white rounded">Cargar estructuras</button>
+        <button id="exportStructures" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar estructuras</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Casos -->
+  <section id="casos" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Casos de análisis (escenarios clínico/experimentales)</h2>
+    <div id="casesArea"></div>
+
+    <details class="mt-4">
+      <summary>Administrar casos (JSON)</summary>
+      <textarea id="casesJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="loadCases" class="px-3 py-1 bg-green-600 text-white rounded">Cargar casos</button>
+        <button id="exportCases" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar casos</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Interactivo -->
+  <section id="interactivo" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Interactivo: arrastra y suelta / completar</h2>
+    <p class="text-sm mb-3">Ejercicios arrastrar-soltar y completar. Los ejercicios se cargan desde JSON (50 ítems) para mantener compatibilidad.</p>
+
+    <div id="interactiveArea" class="space-y-4"></div>
+
+    <details class="mt-4">
+      <summary>Administrar interactivos (JSON)</summary>
+      <textarea id="interJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="loadInter" class="px-3 py-1 bg-green-600 text-white rounded">Cargar interactivos</button>
+        <button id="exportInter" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar interactivos</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Mapas -->
+  <section id="map" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Mapas conceptuales</h2>
+    <div id="mapsDisplay" class="grid grid-cols-1 gap-4 mb-3"></div>
+
+    <details class="mt-4">
+      <summary>Administrar mapas (JSON)</summary>
+      <textarea id="mapsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+      <div class="mt-2">
+        <button id="loadMaps" class="px-3 py-1 bg-green-600 text-white rounded">Cargar mapas</button>
+        <button id="exportMaps" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar mapas</button>
+      </div>
+    </details>
+  </section>
+
+  <!-- Dashboard -->
+  <section id="dash" class="hidden-by-default bg-white p-5 rounded shadow">
+    <h2 class="text-lg font-semibold mb-2">Dashboard de progreso</h2>
+    <p class="text-sm">Puntaje total: <span id="score">0</span></p>
+    <button id="reset" class="mt-2 px-3 py-1 bg-red-500 text-white rounded">Reiniciar progreso</button>
+
+    <div class="mt-4">
+      <h3 class="font-semibold">Progreso por bloque</h3>
+      <ul class="list-disc ml-6 text-sm">
+        <li>Práctica 6: <span id="p1" class="font-semibold text-blue-600">Incompleto</span></li>
+        <li>Práctica 7: <span id="p2" class="font-semibold text-green-600">Incompleto</span></li>
+        <li>Práctica 8–10: <span id="p3" class="font-semibold text-red-600">Incompleto</span></li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<script>
+/* --------------------------
+  DB: contenido reemplazado con prácticas 6-10.
+  Datos compactos: resúmenes, preguntas tipo examen, glosario, flashcards, estructuras, casos, interactivos y mapas.
+-------------------------- */
+let DB = {
+  questions: [
+    /* Práctica 6 - Identificación células */
+    { id:"p6q1", topic:"pr6", text:"¿Qué tinción permite visualizar mejor el núcleo en extendidos de mucosa bucal?", options:["Azul de metileno","Wright","Rojo Congo"], answer:0, explain:"Azul de metileno tiñe ácidos nucleicos y resalta el núcleo."},
+    { id:"p6q2", topic:"pr6", text:"En un extendido sanguíneo teñido con Wright, ¿qué característica distingue a un neutrófilo?", options:["Núcleo multilobulado y gránulos neutros","Núcleo grande y redondo","Eritrocito anucleado"], answer:0, explain:"Neutrófilos muestran núcleo segmentado y gránulos neutros."},
+
+    /* Práctica 7 - Membrana */
+    { id:"p7q1", topic:"pr7", text:"En qué medio un eritrocito sufre plasmólisis verdadera?", options:["Ninguno — las células animales no presentan pared (plasmalisis es vegetal)","0.035 M NaCl","0.6 M NaCl"], answer:0, explain:"Plasmólisis es término vegetal; en eritrocitos ocurre hemólisis o crenación."},
+    { id:"p7q2", topic:"pr7", text:"Qué molécula atraviesa más rápido una bicapa lipídica", options:["CO2","Glucosa","Iones Na+"], answer:0, explain:"Moléculas pequeñas y no polares difunden más rápido."},
+
+    /* Práctica 8 - Lisosomas */
+    { id:"p8q1", topic:"pr8", text:"¿Qué función principal tienen las bombas H⁺-ATPasa en vacuolas digestivas?", options:["Bajar pH intracavidad para activar hidrolasas","Transportar proteínas al nucleo","Unir colorantes aniónicos"], answer:0, explain:"H⁺-ATPasa acidifica la vacuola activando enzimas hidrolíticas."},
+    { id:"p8q2", topic:"pr8", text:"Por qué el rojo Congo se fija intensamente a levaduras hervidas?", options:["Exposición de grupos amino en proteínas desnaturalizadas","Presencia de ADN desnudo","Mayor presencia de lípidos"], answer:0, explain:"La desnaturalización expone sitios básicos que atraen al colorante aniónico."},
+
+    /* Práctica 9 - Mitosis */
+    { id:"p9q1", topic:"pr9", text:"En qué fase mitótica los cinetocoros están alineados en la placa metafásica?", options:["Metafase","Anafase","Profase"], answer:0, explain:"En metafase los cinetocoros se unen a microtúbulos y los cromosomas se alinean."},
+    { id:"p9q2", topic:"pr9", text:"Índice mitótico = 0.20 ¿qué indica?", options:["20% de células en mitosis en el tejido evaluado","Células 20 veces más grandes","La muestra está fija incorrectamente"], answer:0, explain:"IM = fracción de células en mitosis; 0.20 = 20%."},
+
+    /* Práctica 10 - Meiosis */
+    { id:"p10q1", topic:"pr10", text:"En qué subfase aparecen quiasmas como evidencia citológica del crossing-over?", options:["Diploteno","Leptoteno","Diacinesis"], answer:0, explain:"En diploteno los quiasmas son visibles cuando homólogos se separan parcialmente."},
+    { id:"p10q2", topic:"pr10", text:"Resultado final de la meiosis en organismos diploides:", options:["Cuatro células haploides","Dos células diploides","Una célula tetraploide"], answer:0, explain:"La meiosis produce 4 gametos haploides."}
+  ],
+  glossary: [
+    {term:"Índice mitótico (IM)", def:"Proporción de células en mitosis respecto al total observado (células en mitosis / células totales)."},
+    {term:"Orceína acética", def:"Colorante aniónico que se une a proteínas básicas del complejo ADN–histonas; se usa para teñir cromosomas condensados."},
+    {term:"H⁺-ATPasa", def:"Bomba de protones que acidifica vacuolas/lisosomas, activando hidrolasas lisosomales."},
+    {term:"Quiasma", def:"Punto de contacto visible entre cromátidas no hermanas durante la profase I de la meiosis — evidencia de sobrecruzamiento."},
+    {term:"Cinetocoro", def:"Complejo proteico asociado al centrómero, sitio de unión de los microtúbulos del huso."},
+    {term:"Bivalente", def:"Par de cromosomas homólogos emparejados durante la profase I (4 cromátidas)."}
+  ],
+  flashcards: [
+    {front:"Levadura 93°C + Rojo Congo", back:"Proteínas desnaturalizadas; exposición de grupos amino; tinción intensa (Rojo Congo: -SO3⁻ se une a sitios +)."},
+    {front:"Huso mitótico", back:"Red de microtúbulos (tubulina α/β) que segrega cromátidas en mitosis y homólogos en meiosis I."},
+    {front:"Profase I (paquitene)", back:"Apareamiento completo; sobrecruzamiento entre cromátidas no hermanas; recombinación genética."}
+  ],
+  structures: [
+    { id:"s1", title:"Cromosoma en metafase (diagrama)", img:"https://upload.wikimedia.org/wikipedia/commons/4/42/Chromosome_total_structure.svg", options:["Cromosoma metafásico","Cromatina laxa","Mitocondria"], answer:0, explain:"Cromosoma condensado con centrómero y cromátidas hermanas."},
+    { id:"s2", title:"Paramecium (micrografía)", img:"https://upload.wikimedia.org/wikipedia/commons/6/63/Paramecium_caudatum.png", options:["Paramecium","Amoeba","Bacteria"], answer:0, explain:"Protozoo ciliado con citostoma y vacuolas digestivas."}
+  ],
+  cases: [
+    { id:"c1", text:"En un conteo de raíz de cebolla se encontró IM=0.641 (362/572). Proponga interpretación y posibles errores experimentales.", options:["Alta proliferación del meristemo; revisar fijación y conteo","Muestra muerta; repetir tinción","Se ha observado meiosis en vez de mitosis"], answer:0, feedback:"IM alto indica tejido meristemático activo; verificar técnica (fijación, extensión y conteo mínimo 300 células)."},
+    { id:"c2", text:"Observas vacuolas con rojo Congo que se van atenuando en Paramecium. ¿Qué proceso explica el cambio de color?", options:["Hidrólisis lisosomal y pérdida de grupos amino que retienen el colorante","División celular","Fusión mitocondrial"], answer:0, feedback:"Digestión lisosomal hidroliza proteínas/polisacáridos cambiando afinidad tintorial."}
+  ],
+  interactives: [
+    { id:"i1", type:"dragdrop", title:"Relaciona orgánulo → función (simple)", terms:["Lisosoma","Mitocondria","RER"], targets:["Degradación de macromoléculas","Producción de ATP","Síntesis de proteínas"], answerMap:{"Lisosoma":"Degradación de macromoléculas","Mitocondria":"Producción de ATP","RER":"Síntesis de proteínas"} },
+    { id:"i2", type:"complete", title:"Complete: H⁺-ATPasa acidifica la vacuola mediante flujo de ____", prompt:"H⁺-ATPasa acidifica la vacuola mediante flujo de:", answer:"protones" }
+  ],
+  maps: {
+    pr6: "Práctica 6 — Identificación de células\n├─ Concepto: eucariotas vs procariotas\n├─ Preparaciones: extendido bucal (azul metileno), extendido sanguíneo (Wright)\n├─ Estructuras clave: núcleo, citoplasma, eritrocito (anucleado), leucocitos (granulocitos/agranulocitos)\n└─ Aplicación: recuentos, identificación morfológica y funcional",
+    pr7: "Práctica 7 — Actividad de la membrana\n├─ Principio: bicapa fosfolipídica — permeabilidad selectiva\n├─ Ósmosis: hipotónico vs isotónico vs hipertónico\n├─ Modelos: Elodea (turgencia/plasmólisis), huevo (membrana semipermeable)\n└─ Parámetros importantes: concentración (NaCl), tiempo, temperatura",
+    pr8: "Práctica 8 — Lisosomas\n├─ Organismos: Saccharomyces + Paramecium\n├─ Colorante: Rojo Congo (-SO3⁻) ↔ grupos amino expuestos (+NH3)\n├─ Condiciones: 0°C (tenue), 30°C (parcial), 93°C (intensa)\n└─ Mecanismo: fagocitosis → vacuolas digestivas + H⁺-ATPasa → hidrólisis enzimática",
+    pr9: "Práctica 9 — Mitosis (Allium cepa)\n├─ Interfase: G1, S, G2\n├─ Mitosis: profase → metafase → anafase → telofase\n├─ Técnicas: fijación (etanol:ác. acético 3:1), orceína acética, squash\n└─ Cuantitativo: índice mitótico e índices de fase (mín. 300 células)",
+    pr10: "Práctica 10 — Meiosis (Agapanto/Astro) \n├─ Meiosis I: leptoteno, cigoteno, paquiteno, diploteno, diacinesis, metafase I, anafase I, telofase I\n├─ Meiosis II: profase II → telofase II\n├─ Resultado: tetrada isobilateral → granos de polen (4 haploides)\n└─ Conceptos: sinapsis, complejo sinaptonémico, quiasmas, recombinación"
+  }
+};
+
+/* --------------------------
+  Utilidades y renderizado (idéntico al template original)
+-------------------------- */
+function escapeHtml(s){ if(!s) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+/* render glossary */
+function renderGloss(){
+  const list = document.getElementById('glossList'); list.innerHTML = '';
+  DB.glossary.forEach((g,idx)=>{
+    const el = document.createElement('div'); el.className='mb-3 p-2 border rounded';
+    el.innerHTML = `<strong>${escapeHtml(g.term)}</strong><div class="text-sm text-gray-700 mt-1">${escapeHtml(g.def)}</div><div class="mt-1 text-xs text-gray-500">#${idx+1}</div>`;
+    list.appendChild(el);
+  });
+  document.getElementById('glossJSON').value = JSON.stringify(DB.glossary, null, 2);
+}
+
+/* render flashcards */
+function renderFlashcards(){
+  const cont = document.getElementById('flashContainer'); cont.innerHTML = '';
+  DB.flashcards.forEach((f,i)=>{
+    const card = document.createElement('div'); card.className='card'; card.style.width='240px';
+    card.innerHTML = `<div class="card-inner" data-index="${i}"><div class="card-front">${escapeHtml(f.front)}</div><div class="card-back">${escapeHtml(f.back)}</div></div>`;
+    card.querySelector('.card-inner').addEventListener('click', e=>{ const inner=e.currentTarget; inner.style.transform = inner.style.transform ? '' : 'rotateY(180deg)'; });
+    cont.appendChild(card);
+  });
+  document.getElementById('flashJSON').value = JSON.stringify(DB.flashcards, null,2);
+}
+
+/* render structures */
+function renderStructures(){
+  const area = document.getElementById('structuresArea'); area.innerHTML = '';
+  DB.structures.forEach((s, idx)=>{
+    const wrap = document.createElement('div'); wrap.className='p-3 border rounded';
+    wrap.innerHTML = `<div><h4 class="font-semibold">${idx+1}. ${escapeHtml(s.title)}</h4><div class="text-sm mt-1">Imagen: <a class="link-img" target="_blank" href="${s.img}">${s.img}</a></div><div class="mt-2" id="opts-${idx}"></div></div>`;
+    area.appendChild(wrap);
+    const optsDiv = wrap.querySelector(`#opts-${idx}`);
+    s.options.forEach((o,i)=>{ const radio = document.createElement('label'); radio.className='mr-3 block'; radio.innerHTML = `<input type="radio" name="struct_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(radio); });
+    const btn = document.createElement('button'); btn.className='mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent='Verificar';
+    btn.addEventListener('click', ()=>{ const sel = wrap.querySelector(`input[name="struct_${idx}"]:checked`); if(!sel){ alert('Selecciona opción'); return; } if(parseInt(sel.value) === s.answer){ alert('✅ Correcto\n'+(s.explain||'')); score += 5; saveScore(); } else alert('❌ Incorrecto\n'+(s.explain||'')); });
+    wrap.appendChild(btn);
+  });
+  document.getElementById('structuresJSON').value = JSON.stringify(DB.structures, null,2);
+}
+
+/* render cases */
+function renderCases(){
+  const area = document.getElementById('casesArea'); area.innerHTML = '';
+  DB.cases.forEach((c, idx)=>{
+    const wrap = document.createElement('div'); wrap.className='p-3 border rounded mb-3';
+    wrap.innerHTML = `<div><h4 class="font-semibold">Caso ${idx+1}</h4><p class="mt-1">${escapeHtml(c.text)}</p><div class="mt-2" id="caseOpts${idx}"></div></div>`;
+    area.appendChild(wrap);
+    const optsDiv = wrap.querySelector(`#caseOpts${idx}`);
+    c.options.forEach((o,i)=>{ const label=document.createElement('label'); label.className='block'; label.innerHTML = `<input type="radio" name="case_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(label); });
+    const btn = document.createElement('button'); btn.className='mt-2 px-2 py-1 bg-indigo-600 text-white rounded'; btn.textContent='Responder';
+    btn.addEventListener('click', ()=>{ const sel = wrap.querySelector(`input[name="case_${idx}"]:checked`); if(!sel){ alert('Selecciona opción'); return; } if(parseInt(sel.value) === c.answer){ alert('✅ Correcto\n'+(c.feedback||'')); score+=8; saveScore(); localStorage.setItem('block1','Completado'); updateBlocks(); } else { alert('❌ Incorrecto\n'+(c.feedback||'')); } });
+    wrap.appendChild(btn);
+  });
+  document.getElementById('casesJSON').value = JSON.stringify(DB.cases, null,2);
+}
+
+/* render interactives with correct drag/drop handling */
+function renderInteratives(){
+  const area = document.getElementById('interactiveArea'); area.innerHTML = '';
+  DB.interactives.forEach((it, idx)=>{
+    const block = document.createElement('div'); block.className='p-3 border rounded';
+    block.innerHTML = `<h4 class="font-semibold">${idx+1}. ${escapeHtml(it.title || it.id)}</h4>`;
+    if(it.type === 'dragdrop'){
+      const termsDiv = document.createElement('div'); termsDiv.className='mt-2 flex gap-2 flex-wrap';
+      it.terms.forEach((t,i)=>{
+        const d = document.createElement('div'); d.className='draggable'; d.id = `term-${idx}-${i}`; d.draggable=true; d.textContent = t;
+        d.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', d.id); e.dataTransfer.effectAllowed = 'move'; });
+        termsDiv.appendChild(d);
+      });
+      const targetsDiv = document.createElement('div'); targetsDiv.className='mt-3 grid grid-cols-1 gap-2';
+      it.targets.forEach((tg,i)=>{
+        const dz = document.createElement('div'); dz.className='dropzone'; dz.id = `target-${idx}-${i}`; dz.textContent = tg;
+        dz.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dz.style.backgroundColor = '#f8fafc'; });
+        dz.addEventListener('dragleave', e => { dz.style.backgroundColor = ''; });
+        dz.addEventListener('drop', e => {
+          e.preventDefault();
+          dz.style.backgroundColor = '';
+          const id = e.dataTransfer.getData('text/plain');
+          const el = document.getElementById(id);
+          if(!el) return;
+          dz.appendChild(el);
+          const childText = el.textContent.trim();
+          const expected = (it.answerMap && it.answerMap[childText]) ? it.answerMap[childText].trim() : null;
+          const zoneText = dz.textContent.trim();
+          if(expected && expected === zoneText){
+            dz.style.borderColor = '#16a34a'; dz.style.backgroundColor = '#ecfdf5'; dz.dataset.correct='true'; score += 3; saveScore();
+          } else {
+            dz.style.borderColor = '#dc2626'; dz.style.backgroundColor = '#fff1f2'; dz.dataset.correct='false';
+          }
+          it.targets.forEach((ot,j)=>{
+            const otherDz = document.getElementById(`target-${idx}-${j}`);
+            if(!otherDz) return;
+            if(otherDz === dz) return;
+            Array.from(otherDz.querySelectorAll('.draggable')).forEach(ch => { if(ch.id === el.id) otherDz.removeChild(ch); });
+            if(otherDz.querySelectorAll('.draggable').length === 0){
+              otherDz.style.borderColor = '#94a3b8'; otherDz.style.backgroundColor = ''; delete otherDz.dataset.correct;
+            } else {
+              const rem = otherDz.querySelector('.draggable');
+              if(rem){
+                const remText = rem.textContent.trim();
+                const remExp = (it.answerMap && it.answerMap[remText]) ? it.answerMap[remText].trim() : null;
+                if(remExp && remExp === otherDz.textContent.trim()){
+                  otherDz.style.borderColor = '#16a34a'; otherDz.style.backgroundColor = '#ecfdf5'; otherDz.dataset.correct='true';
+                } else {
+                  otherDz.style.borderColor = '#dc2626'; otherDz.style.backgroundColor = '#fff1f2'; otherDz.dataset.correct='false';
+                }
+              }
+            }
+          });
+        });
+        targetsDiv.appendChild(dz);
+      });
+      block.appendChild(termsDiv); block.appendChild(targetsDiv);
+    } else if(it.type === 'complete'){
+      const q = document.createElement('div'); q.innerHTML = `<div class="mt-2">${escapeHtml(it.prompt || '')}</div><input class="mt-2 border rounded p-1" id="fill-${idx}">`;
+      const btn = document.createElement('button'); btn.className='mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent='Verificar';
+      btn.addEventListener('click', ()=>{ const user = document.getElementById(`fill-${idx}`).value.trim(); if(user.toLowerCase() === (it.answer||'').toLowerCase()){ alert('✅ Correcto'); score += 4; saveScore(); } else alert('❌ Incorrecto.'); });
+      block.appendChild(q); block.appendChild(btn);
+    }
+    area.appendChild(block);
+  });
+  document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+}
+
+/* render maps */
+function renderMaps(){
+  const disp = document.getElementById('mapsDisplay'); disp.innerHTML = '';
+  Object.entries(DB.maps || {}).forEach(([k,v])=>{
+    const div = document.createElement('div'); div.className='bg-gray-50 p-3 rounded';
+    div.innerHTML = `<h3 class="font-semibold capitalize">${escapeHtml(k)}</h3><pre class="map">${escapeHtml(v)}</pre>`;
+    disp.appendChild(div);
+  });
+  document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+}
+
+/* Save/load DB to localStorage */
+function saveToLocal(){ localStorage.setItem('DB_biocel', JSON.stringify(DB)); }
+function loadFromLocal(){
+  const raw = localStorage.getItem('DB_biocel');
+  if(raw){ try{ DB = JSON.parse(raw); } catch(e){ console.error(e); } }
+  renderAll();
+}
+function renderAll(){ renderGloss(); renderFlashcards(); renderStructures(); renderCases(); renderInteratives(); renderMaps(); document.getElementById('questionsJSON').value = JSON.stringify(DB.questions||[],null,2); }
+loadFromLocal();
+
+/* Score and dashboard */
+let score = Number(localStorage.getItem('score')||0);
+document.getElementById('score').textContent = score;
+function saveScore(){ localStorage.setItem('score', score); document.getElementById('score').textContent = score; }
+function updateBlocks(){ document.getElementById('p1').textContent = localStorage.getItem('block1') || 'Incompleto'; document.getElementById('p2').textContent = localStorage.getItem('block2') || 'Incompleto'; document.getElementById('p3').textContent = localStorage.getItem('block3') || 'Incompleto'; }
+updateBlocks();
+
+/* Navigation wiring */
+const sections = document.querySelectorAll("section");
+document.querySelectorAll(".btn").forEach(btn=>{ btn.classList.add("px-3","py-1","rounded","bg-indigo-600","text-white"); btn.addEventListener('click',()=>{ sections.forEach(sec=>sec.classList.add('hidden-by-default')); document.getElementById(btn.dataset.target).classList.remove('hidden-by-default'); window.scrollTo({top:0,behavior:'smooth'}); }); });
+
+/* File import/export */
+const fileInput = document.getElementById('fileInput');
+document.querySelector('.btn-file').addEventListener('click', ()=> fileInput.click());
+fileInput.addEventListener('change', handleFile, false);
+document.getElementById('exportJSON').addEventListener('click', exportAll);
+
+function handleFile(evt){
+  const f = evt.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try {
+      const obj = JSON.parse(e.target.result);
+      DB = Object.assign({}, DB, obj);
+      renderAll();
+      saveToLocal();
+      alert('Contenido importado correctamente.');
+    } catch(err){ alert('Error leyendo JSON: ' + err.message); }
+  };
+  reader.readAsText(f);
+}
+function exportAll(){
+  const dataStr = JSON.stringify(DB, null, 2);
+  const blob = new Blob([dataStr], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'contenido_biologia_celular.json'; document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* CRUD simple for glosario, flashcards, etc. */
+document.getElementById('addTerm').addEventListener('click', ()=>{
+  const t = document.getElementById('termInput').value.trim(); const d = document.getElementById('defInput').value.trim();
+  if(!t || !d){ alert('Rellena término y definición'); return; }
+  DB.glossary.unshift({term:t,def:d}); document.getElementById('termInput').value=''; document.getElementById('defInput').value=''; renderGloss(); saveToLocal();
+});
+document.getElementById('clearGloss').addEventListener('click', ()=>{ if(!confirm('Borrar todo el glosario?')) return; DB.glossary=[]; renderGloss(); saveToLocal(); });
+document.getElementById('importGloss').addEventListener('click', ()=>{ try{ const arr = JSON.parse(document.getElementById('glossJSON').value); if(Array.isArray(arr)){ DB.glossary = arr; renderGloss(); saveToLocal(); alert('Glosario importado'); } else alert('Formato inválido'); } catch(e){ alert('JSON inválido'); } });
+document.getElementById('exportGloss').addEventListener('click', ()=>{ document.getElementById('glossJSON').value = JSON.stringify(DB.glossary, null, 2); });
+
+document.getElementById('loadFlash').addEventListener('click', ()=>{ try{ const arr = JSON.parse(document.getElementById('flashJSON').value); if(Array.isArray(arr)){ DB.flashcards = arr; renderFlashcards(); saveToLocal(); alert('Flashcards cargadas'); } else alert('Formato inválido'); } catch(e){ alert('JSON inválido'); } });
+document.getElementById('exportFlash').addEventListener('click', ()=>{ document.getElementById('flashJSON').value = JSON.stringify(DB.flashcards, null, 2); });
+
+document.getElementById('loadStructures').addEventListener('click', ()=>{ try{ const arr = JSON.parse(document.getElementById('structuresJSON').value); if(Array.isArray(arr)){ DB.structures = arr; renderStructures(); saveToLocal(); alert('Estructuras cargadas'); } else alert('Formato inválido'); } catch(e){ alert('JSON inválido'); } });
+document.getElementById('exportStructures').addEventListener('click', ()=>{ document.getElementById('structuresJSON').value = JSON.stringify(DB.structures, null,2); });
+
+document.getElementById('loadCases').addEventListener('click', ()=>{ try{ const arr = JSON.parse(document.getElementById('casesJSON').value); if(Array.isArray(arr)){ DB.cases = arr; renderCases(); saveToLocal(); alert('Casos cargados'); } else alert('Formato inválido'); } catch(e){ alert('JSON inválido'); } });
+document.getElementById('exportCases').addEventListener('click', ()=>{ document.getElementById('casesJSON').value = JSON.stringify(DB.cases, null,2); });
+
+document.getElementById('loadInter').addEventListener('click', ()=>{ try{ const arr = JSON.parse(document.getElementById('interJSON').value); if(Array.isArray(arr)){ DB.interactives = arr; renderInteratives(); saveToLocal(); alert('Interactivos cargados'); } else alert('Formato inválido'); } catch(e){ alert('JSON inválido'); } });
+document.getElementById('exportInter').addEventListener('click', ()=>{ document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2); });
+
+document.getElementById('loadMaps').addEventListener('click', ()=>{ try{ const obj = JSON.parse(document.getElementById('mapsJSON').value); if(typeof obj === 'object'){ DB.maps = obj; renderMaps(); saveToLocal(); alert('Mapas cargados'); } else alert('Formato inválido'); } catch(e){ alert('JSON inválido'); } });
+document.getElementById('exportMaps').addEventListener('click', ()=>{ document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2); });
+
+/* Quiz: sequential behavior */
+let filteredQuestions = DB.questions.slice();
+let qIndex = 0;
+let currentQuestion = null;
+function refreshFiltered(topic){
+  filteredQuestions = (topic && topic !== 'all') ? DB.questions.filter(q=> q.topic === topic) : DB.questions.slice();
+  qIndex = 0;
+  document.getElementById('qTotal').textContent = filteredQuestions.length;
+  renderCurrentQuestion();
+}
+function renderCurrentQuestion(){
+  if(filteredQuestions.length === 0){ document.getElementById('qText').textContent = 'No hay preguntas en este tema.'; document.getElementById('qOptions').innerHTML=''; document.getElementById('qNumber').textContent='0'; currentQuestion = null; return; }
+  if(qIndex < 0) qIndex = 0;
+  if(qIndex >= filteredQuestions.length) qIndex = filteredQuestions.length -1;
+  const q = filteredQuestions[qIndex];
+  document.getElementById('qText').textContent = q.text;
+  const opts = document.getElementById('qOptions'); opts.innerHTML = '';
+  q.options.forEach((o,i)=>{ const label = document.createElement('label'); label.className='block'; label.innerHTML = `<input type="radio" name="qopt" value="${i}"> ${escapeHtml(o)}`; opts.appendChild(label); });
+  document.getElementById('qNumber').textContent = (qIndex+1);
+  document.getElementById('qTotal').textContent = filteredQuestions.length;
+  currentQuestion = q;
+}
+document.getElementById('quizTopic').addEventListener('change', ()=>{ refreshFiltered(document.getElementById('quizTopic').value); });
+document.getElementById('nextQ').addEventListener('click', ()=>{ if(filteredQuestions.length===0){ alert('No hay preguntas.'); return;} if(qIndex < filteredQuestions.length-1) qIndex++; renderCurrentQuestion(); });
+document.getElementById('prevQ').addEventListener('click', ()=>{ if(filteredQuestions.length===0){ alert('No hay preguntas.'); return;} if(qIndex > 0) qIndex--; renderCurrentQuestion(); });
+document.getElementById('checkA').addEventListener('click', ()=>{ const sel = document.querySelector('input[name="qopt"]:checked'); const res = document.getElementById('qResult'); if(!currentQuestion){ res.textContent='No hay pregunta seleccionada.'; return; } if(!sel){ res.textContent='Selecciona una opción.'; return; } if(parseInt(sel.value) === currentQuestion.answer){ res.textContent='✅ Correcto. ' + (currentQuestion.explain||''); score += 10; saveScore(); } else res.textContent='❌ Incorrecto. ' + (currentQuestion.explain||''); });
+
+document.getElementById('showAll').addEventListener('click', ()=>{ document.getElementById('questionsJSON').value = JSON.stringify(DB.questions, null, 2); });
+
+/* Load questions JSON editor */
+document.getElementById('loadQuestions').addEventListener('click', ()=>{ try{ const arr = JSON.parse(document.getElementById('questionsJSON').value); if(Array.isArray(arr)){ DB.questions = arr; refreshFiltered(document.getElementById('quizTopic').value); renderAll(); saveToLocal(); alert('Preguntas cargadas'); } else alert('Formato inválido (se espera array).'); } catch(e){ alert('JSON inválido'); } });
+
+/* Reset progress */
+document.getElementById('reset').addEventListener('click', ()=>{ if(!confirm('Reiniciar todo el progreso?')) return; localStorage.clear(); score=0; document.getElementById('score').textContent = 0; updateBlocks(); loadFromLocal(); location.reload(); });
+
+/* initial render and quiz setup */
+renderAll();
+refreshFiltered('all');
+
+</script>
+</body>
+</html>
