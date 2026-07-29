@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Plataforma Educativa (Fix)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .hidden-by-default {
+            display: none;
+        }
+        .card {
+            perspective: 1000px;
+        }
+        .card-inner {
+            position: relative;
+            width: 240px;
+            height: 140px;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card:hover .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 500;
+            padding: 0.75rem;
+            box-sizing: border-box;
+        }
+        .card-front {
+            background-color: #059669;
+            color: white;
+        }
+        .card-back {
+            background-color: #b91c1c;
+            color: white;
+            transform: rotateY(180deg);
+        }
+        .draggable {
+            cursor: grab;
+            background-color: #dbeafe;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            margin: 0.25rem;
+            display: inline-block;
+            user-select: none;
+        }
+        .dropzone {
+            border: 2px dashed #94a3b8;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            min-height: 50px;
+            transition: border-color 0.25s, background-color 0.25s;
+        }
+        .btn-file {
+            background: #2563eb;
+            color: white;
+            padding: .4rem .75rem;
+            border-radius: .4rem;
+            cursor: pointer;
+        }
+        pre.map {
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+        }
+        .link-img {
+            color: #1d4ed8;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-6xl mx-auto p-6">
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-indigo-600">Plataforma Educativa Interactiva</h1>
+            <p class="text-sm text-gray-600 mt-2">
+                Recursos sobre <strong>cualquier contenido educativo, que desees agregar</strong>. Incluye quizzes secuenciales, glosario, flashcards, estructuras (imágenes via links), casos y actividades interactivas. Progreso guardado localmente.
+            </p>
+
+            <nav class="mt-4 flex flex-wrap gap-2">
+                <button class="btn" data-target="home">Inicio</button>
+                <button class="btn" data-target="quiz">Quiz</button>
+                <button class="btn" data-target="gloss">Glosario</button>
+                <button class="btn" data-target="flash">Flashcards</button>
+                <button class="btn" data-target="estructuras">Estructuras</button>
+                <button class="btn" data-target="casos">Casos</button>
+                <button class="btn" data-target="interactivo">Interactivo</button>
+                <button class="btn" data-target="map">Mapas</button>
+                <button class="btn" data-target="dash">Dashboard</button>
+                <label class="btn-file ml-2">
+                    Importar contenido (JSON)
+                    <input id="fileInput" type="file" accept="application/json" style="display:none">
+                </label>
+                <button id="exportJSON" class="btn">Exportar contenido</button>
+            </nav>
+        </header>
+
+<!-- Home -->
+<section id="home" class="bg-white p-5 rounded shadow">
+    <h2 id="homeTitle" class="text-xl font-semibold mb-2">Bienvenido</h2>
+
+    <p id="homeDescription" class="text-sm text-gray-700">
+        La plataforma está diseñada para estudiar y practicar los tres bloques fundamentales:
+        <strong>Endomembrana</strong> (síntesis, procesamiento y tráfico de proteínas/lípidos),
+        <strong>Estructuras y Procesos</strong> (ribosomas, lisosomas, RE, Golgi y mecanismos moleculares)
+        y <strong>Mitocondrias y Metabolismo – Plastidios y Cloroplastos</strong> (bioenergética, ATP, fotosíntesis).
+        Usa las herramientas interactivas para autoevaluación.
+    </p>
+
+    <details class="mt-4">
+        <summary class="cursor-pointer font-semibold">
+            Editar contenido de Inicio (JSON)
+        </summary>
+
+        <textarea id="homeJSON"
+            style="width:100%;height:160px"
+            class="mt-2 border rounded p-2 font-mono text-sm">
+{
+  "title": "Bienvenido",
+  "description": "Texto de introducción editable desde JSON."
+}
+        </textarea>
+
+        <div class="mt-2 flex gap-2">
+            <button id="loadHomeJSON" class="px-3 py-1 bg-green-600 text-white rounded">
+                Cargar Inicio
+            </button>
+            <button id="exportHomeJSON" class="px-3 py-1 bg-gray-600 text-white rounded">
+                Exportar Inicio
+            </button>
+        </div>
+    </details>
+</section>
+
+        <!-- Quiz -->
+        <section id="quiz" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Quiz (secuencial por tema)</h2>
+            <div class="flex gap-3 mb-3">
+                <button id="prevQ" class="px-3 py-1 bg-gray-500 text-white rounded">Anterior</button>
+                <button id="nextQ" class="px-3 py-1 bg-indigo-600 text-white rounded">Siguiente</button>
+                <button id="showAll" class="px-3 py-1 bg-gray-600 text-white rounded">Mostrar preguntas (JSON)</button>
+                <select id="quizTopic" class="rounded border px-2"></select>
+            </div>
+
+            <div id="quizArea">
+                <p id="qText" class="font-medium mb-2">
+                    Cargando pregunta...
+                </p>
+                <div id="qOptions" class="space-y-2 mb-3"></div>
+                <button id="checkA" class="px-3 py-1 bg-amber-500 text-white rounded">Verificar</button>
+                <p id="qResult" class="mt-2 text-sm"></p>
+                <p class="text-xs text-gray-500 mt-2">
+                    Pregunta <span id="qNumber">0</span> de <span id="qTotal">0</span>
+                </p>
+            </div>
+
+            <details class="mt-4">
+                <summary class="cursor-pointer">Ver/Editar inventario de preguntas (JSON)</summary>
+                <textarea id="questionsJSON" style="width:100%;height:200px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadQuestions" class="px-3 py-1 bg-green-600 text-white rounded">Cargar preguntas desde JSON</button>
+                </div>
+            </details>
+            <details class="mt-4">
+                <summary class="cursor-pointer">Ver/Editar bloques del quiz (JSON)</summary>
+                <textarea id="quizTopicsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadQuizTopics" class="px-3 py-1 bg-green-600 text-white rounded">Cargar bloques desde JSON</button>
+                    <button id="exportQuizTopics" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar bloques</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Glosario -->
+        <section id="gloss" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Glosario (términos técnicos)</h2>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <input id="glossSearch" placeholder="Buscar término..." class="w-full p-2 border rounded mb-3" />
+                    <div id="glossList" style="max-height:420px;overflow:auto"></div>
+                </div>
+                <div>
+                    <h3 class="font-semibold">Agregar/editar término</h3>
+                    <input id="termInput" placeholder="Término" class="w-full p-2 border rounded mb-2" />
+                    <textarea id="defInput" placeholder="Definición" class="w-full p-2 border rounded mb-2" style="height:160px"></textarea>
+                    <div class="flex gap-2">
+                        <button id="addTerm" class="px-3 py-1 bg-green-600 text-white rounded">Agregar término</button>
+                        <button id="clearGloss" class="px-3 py-1 bg-red-500 text-white rounded">Borrar todo</button>
+                    </div>
+                </div>
+            </div>
+
+            <details class="mt-4">
+                <summary>Exportar/Importar glosario (JSON)</summary>
+                <textarea id="glossJSON" style="width:100%;height:140px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="importGloss" class="px-3 py-1 bg-blue-600 text-white rounded">Importar glosario</button>
+                    <button id="exportGloss" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar glosario</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Flashcards -->
+        <section id="flash" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Flashcards (giran al hacer hover o clic)</h2>
+            <div class="flex flex-wrap gap-4" id="flashContainer" style="min-height:160px"></div>
+
+            <details class="mt-4">
+                <summary>Administrar flashcards (JSON)</summary>
+                <textarea id="flashJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadFlash" class="px-3 py-1 bg-green-600 text-white rounded">Cargar flashcards</button>
+                    <button id="exportFlash" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar flashcards</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Estructuras -->
+        <section id="estructuras" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Estructuras: identificación (imágenes como links)</h2>
+            <p class="text-sm text-gray-700 mb-3">
+                Haz clic en el enlace para abrir la imagen en nueva pestaña y luego elige la opción correcta.
+            </p>
+
+            <div id="structuresArea" class="space-y-4"></div>
+
+            <details class="mt-4">
+                <summary>Administrar estructuras (JSON)</summary>
+                <textarea id="structuresJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadStructures" class="px-3 py-1 bg-green-600 text-white rounded">Cargar estructuras</button>
+                    <button id="exportStructures" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar estructuras</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Casos -->
+        <section id="casos" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Casos de análisis (escenarios clínico/experimentales)</h2>
+            <div id="casesArea"></div>
+
+            <details class="mt-4">
+                <summary>Administrar casos (JSON)</summary>
+                <textarea id="casesJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadCases" class="px-3 py-1 bg-green-600 text-white rounded">Cargar casos</button>
+                    <button id="exportCases" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar casos</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Interactivo -->
+        <section id="interactivo" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Interactivo: arrastra y suelta / completar</h2>
+            <p class="text-sm mb-3">
+                Ejercicios arrastrar-soltar y completar. Los ejercicios se cargan desde JSON (50 ítems) para mantener compatibilidad.
+            </p>
+
+            <div id="interactiveArea" class="space-y-4"></div>
+
+            <details class="mt-4">
+                <summary>Administrar interactivos (JSON)</summary>
+                <textarea id="interJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadInter" class="px-3 py-1 bg-green-600 text-white rounded">Cargar interactivos</button>
+                    <button id="exportInter" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar interactivos</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Mapas -->
+        <section id="map" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Mapas conceptuales</h2>
+            <div id="mapsDisplay" class="grid grid-cols-1 gap-4 mb-3"></div>
+
+            <details class="mt-4">
+                <summary>Administrar mapas (JSON)</summary>
+                <textarea id="mapsJSON" style="width:100%;height:160px" class="mt-2 border rounded p-2 font-mono text-sm"></textarea>
+                <div class="mt-2">
+                    <button id="loadMaps" class="px-3 py-1 bg-green-600 text-white rounded">Cargar mapas</button>
+                    <button id="exportMaps" class="px-3 py-1 bg-gray-600 text-white rounded">Exportar mapas</button>
+                </div>
+            </details>
+        </section>
+
+        <!-- Dashboard -->
+        <section id="dash" class="hidden-by-default bg-white p-5 rounded shadow">
+            <h2 class="text-lg font-semibold mb-2">Dashboard de progreso</h2>
+            <p class="text-sm">
+                Puntaje total: <span id="score">0</span>
+            </p>
+            <button id="reset" class="mt-2 px-3 py-1 bg-red-500 text-white rounded">Reiniciar progreso</button>
+
+            <div class="mt-4">
+                <h3 class="font-semibold">Progreso por bloque</h3>
+                <ul class="list-disc ml-6 text-sm">
+                    <li>1) Endomembrana: <span id="p1" class="font-semibold text-blue-600">Incompleto</span></li>
+                    <li>2) Estructuras y Procesos: <span id="p2" class="font-semibold text-green-600">Incompleto</span></li>
+                    <li>3) Mitocondrias y Metabolismo: <span id="p3" class="font-semibold text-red-600">Incompleto</span></li>
+                </ul>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        function normalizeText(value) {
+            return String(value || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        /* --------------------------
+  ESTRUCTURA DE DATOS (DB) - muestra mínima inicial para pruebas.
+  Reemplaza con tu JSON grande importándolo.
+-------------------------- */
+        let DB = {
+            quizTopics: [
+                { value: "endomembrana", label: "1) Endomembrana" },
+                { value: "estructuras", label: "2) Estructuras y Procesos" },
+                { value: "mito", label: "3) Mitocondrias y Metabolismo" }
+            ],
+            questions: [{
+                id: "q1",
+                topic: "endomembrana",
+                text: "¿Cuál es la secuencia típica para una proteína secretada?",
+                options: ["Núcleo → RER → Golgi → Membrana",
+                    "RER → Lisosoma → Núcleo",
+                    "Golgi → RER → Membrana"],
+                answer: 0,
+                explain: "ARNm se traduce en RER; proteínas maduran en Golgi y se secretan."
+            },
+                {
+                    id: "q2",
+                    topic: "estructuras",
+                    text: "¿Qué subunidad ribosomal contiene el ARNr 16S en procariotas?",
+                    options: ["30S",
+                        "50S",
+                        "40S"],
+                    answer: 0,
+                    explain: "Procariotas: ribosoma 70S = 30S(16S) + 50S(23S+5S)."
+                },
+                {
+                    id: "q3",
+                    topic: "mito",
+                    text: "¿Dónde se localiza la ATP sintasa en la mitocondria?",
+                    options: ["Membrana interna",
+                        "Membrana externa",
+                        "Matriz"],
+                    answer: 0,
+                    explain: "La ATP sintasa está incrustada en la membrana interna y gira para sintetizar ATP."
+                }],
+            glossary: [{
+                term: "N-glicosilación",
+                def: "Adición de oligosacáridos a residuos Asn; inicia en RER y continúa en Golgi; esencial para plegamiento y reconocimiento."
+            },
+                {
+                    term: "SRP",
+                    def: "Partícula de reconocimiento de señal; dirige ribosomas con péptido señal al translocón del RER."
+                },
+                {
+                    term: "Crestas mitocondriales",
+                    def: "Plegamientos de la membrana interna que aumentan el área para la cadena respiratoria y la ATP síntesis."
+                }],
+            flashcards: [{
+                front: "RER",
+                back: "Retículo endoplásmico rugoso: síntesis de proteínas secretadas y de membrana; ribosomas adheridos."
+            },
+                {
+                    front: "Golgi",
+                    back: "Procesamiento y maduración de glicoproteínas; empaquetamiento y formación de vesículas."
+                },
+                {
+                    front: "ATP sintasa",
+                    back: "Complejo FoF1 que cataliza ADP + Pi → ATP usando el gradiente de protones."
+                }],
+            structures: [{
+                id: "s1",
+                title: "Mitocondria (diagrama)",
+                img: "https://upload.wikimedia.org/wikipedia/commons/3/3c/Mitochondrion_malic_rotated.svg",
+                options: ["Mitocondria",
+                    "Cloroplasto",
+                    "Ribosoma"],
+                answer: 0,
+                explain: "Doble membrana y crestas; matriz con ADN mitocondrial."
+            },
+                {
+                    id: "s2",
+                    title: "Cloroplasto (diagrama)",
+                    img: "https://upload.wikimedia.org/wikipedia/commons/8/84/Chloroplast_diagram-en.svg",
+                    options: ["Mitocondria",
+                        "Cloroplasto",
+                        "Aparato de Golgi"],
+                    answer: 1,
+                    explain: "Tilacoides y grana, estroma con ciclo de Calvin."
+                }],
+            cases: [{
+                id: "c1",
+                text: "Células con acumulación de proteínas en RER muestran estrés del retículo. ¿Qué vía celular se activa frecuentemente?",
+                options: ["UPR (unfolded protein response)",
+                    "Autofagia",
+                    "Fotosíntesis"],
+                answer: 0,
+                feedback: "La UPR responde al acúmulo de proteínas mal plegadas en RER."
+            }],
+            interactives: [{
+                id: "i1",
+                type: "dragdrop",
+                title: "Relaciona orgánulo → función",
+                terms: ["RER",
+                    "Lisosoma",
+                    "Mitocondria"],
+                targets: ["Síntesis proteínas",
+                    "Degradación macromoléculas",
+                    "Producción de ATP"],
+                answerMap: {
+                    "RER": "Síntesis proteínas",
+                    "Lisosoma": "Degradación macromoléculas",
+                    "Mitocondria": "Producción de ATP"
+                }
+            },
+                {
+                    id: "i2",
+                    type: "complete",
+                    title: "Completa: ATP sintetasa usa flujo de ____ para producir ATP",
+                    prompt: "ATP sintasa usa flujo de _____ para producir ATP:",
+                    answer: "protones"
+                }],
+            maps: {
+                endomembrana: "Endomembrana\n├─ Núcleo → ARNm → salida por poros\n├─ RER → Ribosomas adheridos; translocón; N-glicosilación inicia\n├─ Golgi → Cis/Medial/Trans; maduración glicoproteínas; formación vesículas (COPII/COPI)\n└─ Lisosomas/Vacuolas/Peroxisomas: degradación y reciclaje",
+                estructuras: "Estructuras y Procesos\n├─ Ribosomas 70S/80S (subunidades y ARNr)\n├─ Chaperonas (Hsp70) y chaperoninas (GroEL/GroES)\n└─ Transporte vesicular: COPII anterógrado, COPI retrógrado, clatrina endocitosis",
+                mito: "Mitocondrias y Metabolismo\n├─ Doble membrana: externa permeable; interna imperm. con crestas\n├─ Matriz: ciclo de Krebs, ADNmt\n└─ Membrana interna: ETC → gradiente H+ → FoF1 ATP sintasa"
+            }
+        };
+
+        /* --------------------------
+  Utilidades y renderizado
+-------------------------- */
+        function ensureDbShape() {
+            DB.quizTopics = Array.isArray(DB.quizTopics) ? DB.quizTopics : [];
+            DB.questions = Array.isArray(DB.questions) ? DB.questions : [];
+            DB.glossary = Array.isArray(DB.glossary) ? DB.glossary : [];
+            DB.flashcards = Array.isArray(DB.flashcards) ? DB.flashcards : [];
+            DB.structures = Array.isArray(DB.structures) ? DB.structures : [];
+            DB.cases = Array.isArray(DB.cases) ? DB.cases : [];
+            DB.interactives = Array.isArray(DB.interactives) ? DB.interactives : [];
+            DB.maps = DB.maps && typeof DB.maps === 'object' ? DB.maps : {};
+        }
+
+        function escapeHtml(s) {
+            if (!s) return ''; return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+        }
+
+        /* render glossary */
+        function renderGloss() {
+            const list = document.getElementById('glossList'); list.innerHTML = '';
+            const glossary = Array.isArray(DB.glossary) ? DB.glossary : [];
+            const query = normalizeText(document.getElementById('glossSearch').value || '');
+            glossary
+                .filter(item=> {
+                    const term = normalizeText(item.term);
+                    const def = normalizeText(item.def);
+                    return !query || term.includes(query) || def.includes(query);
+                })
+                .forEach((g, idx)=> {
+                    const div = document.createElement('div'); div.className = 'p-2 border-b';
+                    div.innerHTML = `<strong>${escapeHtml(g.term)}</strong><p class="text-xs text-gray-700">${escapeHtml(g.def)}</p>
+                <button data-i="${idx}" class="text-blue-600 text-xs mt-1">Editar</button>`;
+                    list.appendChild(div);
+                });
+            list.querySelectorAll('button').forEach(btn=> {
+                btn.addEventListener('click', ()=> {
+                    const i = parseInt(btn.dataset.i);
+                    document.getElementById('termInput').value = DB.glossary[i].term || '';
+                    document.getElementById('defInput').value = DB.glossary[i].def || '';
+                    DB.glossary.splice(i, 1);
+                    renderGloss();
+                    saveToLocal();
+                });
+            });
+            document.getElementById('glossJSON').value = JSON.stringify(glossary, null, 2);
+        }
+        document.getElementById('glossSearch').addEventListener('input', renderGloss);
+
+        /* render flashcards */
+        function renderFlashcards() {
+            const cont = document.getElementById('flashContainer'); cont.innerHTML = '';
+            const flashcards = Array.isArray(DB.flashcards) ? DB.flashcards : [];
+            flashcards.forEach((f, i)=> {
+                const card = document.createElement('div'); card.className = 'card'; card.style.width = '240px';
+                card.innerHTML = `<div class="card-inner" data-index="${i}"><div class="card-front">${escapeHtml(f.front)}</div><div class="card-back">${escapeHtml(f.back)}</div></div>`;
+                card.querySelector('.card-inner').addEventListener('click', e=> {
+                    const inner = e.currentTarget; inner.style.transform = inner.style.transform ? '': 'rotateY(180deg)';
+                });
+                cont.appendChild(card);
+            });
+            document.getElementById('flashJSON').value = JSON.stringify(flashcards, null, 2);
+        }
+
+        /* render structures */
+        function renderStructures() {
+            const area = document.getElementById('structuresArea'); area.innerHTML = '';
+            const structures = Array.isArray(DB.structures) ? DB.structures : [];
+            structures.forEach((s, idx)=> {
+                const options = Array.isArray(s.options) ? s.options : [];
+                const wrap = document.createElement('div'); wrap.className = 'p-3 border rounded';
+                wrap.innerHTML = `<div><h4 class="font-semibold">${idx+1}. ${escapeHtml(s.title)}</h4><div class="text-sm mt-1">Imagen: <a class="link-img" target="_blank" href="${s.img}">${s.img}</a></div><div class="mt-2" id="opts-${idx}"></div></div>`;
+                area.appendChild(wrap);
+                const optsDiv = wrap.querySelector(`#opts-${idx}`);
+                options.forEach((o, i)=> {
+                    const radio = document.createElement('label'); radio.className = 'mr-3 block'; radio.innerHTML = `<input type="radio" name="struct_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(radio);
+                });
+                const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
+                btn.addEventListener('click', ()=> {
+                    const sel = wrap.querySelector(`input[name="struct_${idx}"]:checked`); if (!sel) {
+                        alert('Selecciona opción'); return;
+                    } if (parseInt(sel.value) === s.answer) {
+                        alert('✅ Correcto\n'+(s.explain || '')); score += 5; saveScore();
+                    } else alert('❌ Incorrecto\n'+(s.explain || ''));
+                });
+                wrap.appendChild(btn);
+            });
+            document.getElementById('structuresJSON').value = JSON.stringify(structures, null, 2);
+        }
+
+        /* render cases */
+        function renderCases() {
+            const area = document.getElementById('casesArea'); area.innerHTML = '';
+            const casesList = Array.isArray(DB.cases) ? DB.cases : [];
+            casesList.forEach((c,
+                idx)=> {
+                const options = Array.isArray(c.options) ? c.options : [];
+                const wrap = document.createElement('div'); wrap.className = 'p-3 border rounded mb-3';
+                wrap.innerHTML = `<div><h4 class="font-semibold">Caso ${idx+1}</h4><p class="mt-1">${escapeHtml(c.text)}</p><div class="mt-2" id="caseOpts${idx}"></div></div>`;
+                area.appendChild(wrap);
+                const optsDiv = wrap.querySelector(`#caseOpts${idx}`);
+                options.forEach((o, i)=> {
+                    const label = document.createElement('label'); label.className = 'block'; label.innerHTML = `<input type="radio" name="case_${idx}" value="${i}"> ${escapeHtml(o)}`; optsDiv.appendChild(label);
+                });
+                const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-indigo-600 text-white rounded'; btn.textContent = 'Responder';
+                btn.addEventListener('click',
+                    ()=> {
+                        const sel = wrap.querySelector(`input[name="case_${idx}"]:checked`); if (!sel) {
+                            alert('Selecciona opción'); return;
+                        } if (parseInt(sel.value) === c.answer) {
+                            alert('✅ Correcto\n'+(c.feedback || '')); score += 8; saveScore(); localStorage.setItem('block1', 'Completado'); updateBlocks();
+                        } else {
+                            alert('❌ Incorrecto\n'+(c.feedback || ''));
+                        }
+                    });
+                wrap.appendChild(btn);
+            });
+            document.getElementById('casesJSON').value = JSON.stringify(casesList, null, 2);
+        }
+
+        /* render interactives with correct drag/drop handling */
+        function renderInteratives() {
+            const area = document.getElementById('interactiveArea'); area.innerHTML = '';
+            (Array.isArray(DB.interactives) ? DB.interactives : []).forEach((it,
+                idx)=> {
+                const block = document.createElement('div'); block.className = 'p-3 border rounded';
+                block.innerHTML = `<h4 class="font-semibold">${idx+1}. ${escapeHtml(it.title || it.id)}</h4>`;
+                if (it.type === 'dragdrop') {
+                    const terms = Array.isArray(it.terms) ? it.terms : [];
+                    const targets = Array.isArray(it.targets) ? it.targets : [];
+                    const termsDiv = document.createElement('div'); termsDiv.className = 'mt-2 flex gap-2 flex-wrap';
+                    terms.forEach((t, i)=> {
+                        const d = document.createElement('div'); d.className = 'draggable'; d.id = `term-${idx}-${i}`; d.draggable = true; d.textContent = t;
+                        d.addEventListener('dragstart', e => {
+                            e.dataTransfer.setData('text/plain', d.id); e.dataTransfer.effectAllowed = 'move';
+                        });
+                        termsDiv.appendChild(d);
+                    });
+                    const targetsDiv = document.createElement('div'); targetsDiv.className = 'mt-3 grid grid-cols-1 gap-2';
+                    targets.forEach((tg, i)=> {
+                        const dz = document.createElement('div'); dz.className = 'dropzone'; dz.id = `target-${idx}-${i}`;
+                        dz.dataset.target = tg;
+                        const label = document.createElement('span');
+                        label.className = 'dropzone-label';
+                        label.textContent = tg;
+                        dz.appendChild(label);
+                        dz.addEventListener('dragover', e => {
+                            e.preventDefault(); e.dataTransfer.dropEffect = 'move'; dz.style.backgroundColor = '#f8fafc';
+                        });
+                        dz.addEventListener('dragleave', e => {
+                            dz.style.backgroundColor = '';
+                        });
+                        dz.addEventListener('drop', e => {
+                            e.preventDefault();
+                            dz.style.backgroundColor = '';
+                            const id = e.dataTransfer.getData('text/plain');
+                            const el = document.getElementById(id);
+                            if (!el) return;
+                            // append (this move automatically removes from previous parent)
+                            dz.appendChild(el);
+                            // compute trimmed texts
+                            const childText = el.textContent.trim();
+                            const expected = normalizeText((it.answerMap && it.answerMap[childText]) ? it.answerMap[childText]: '');
+                            const zoneText = normalizeText(dz.dataset.target || label.textContent || '');
+                            if (expected && expected === zoneText) {
+                                dz.style.borderColor = '#16a34a'; dz.style.backgroundColor = '#ecfdf5'; dz.dataset.correct = 'true'; score += 3; saveScore();
+                            } else {
+                                dz.style.borderColor = '#dc2626'; dz.style.backgroundColor = '#fff1f2'; dz.dataset.correct = 'false';
+                            }
+                            // For other zones: if empty reset; if they have children, re-evaluate them
+                            targets.forEach((ot, j)=> {
+                                const otherDz = document.getElementById(`target-${idx}-${j}`);
+                                if (!otherDz) return;
+                                if (otherDz === dz) return;
+                                // remove any duplicate of the moved element (safety)
+                                Array.from(otherDz.querySelectorAll('.draggable')).forEach(ch => {
+                                    if (ch.id === el.id) otherDz.removeChild(ch);
+                                });
+                                if (otherDz.querySelectorAll('.draggable').length === 0) {
+                                    otherDz.style.borderColor = '#94a3b8'; otherDz.style.backgroundColor = ''; delete otherDz.dataset.correct;
+                                } else {
+                                    const rem = otherDz.querySelector('.draggable');
+                                    if (rem) {
+                                        const remText = rem.textContent.trim();
+                                        const remExp = normalizeText((it.answerMap && it.answerMap[remText]) ? it.answerMap[remText]: '');
+                                        const otherLabel = otherDz.querySelector('.dropzone-label');
+                                        const otherZoneText = normalizeText(otherDz.dataset.target || (otherLabel ? otherLabel.textContent : ''));
+                                        if (remExp && remExp === otherZoneText) {
+                                            otherDz.style.borderColor = '#16a34a'; otherDz.style.backgroundColor = '#ecfdf5'; otherDz.dataset.correct = 'true';
+                                        } else {
+                                            otherDz.style.borderColor = '#dc2626'; otherDz.style.backgroundColor = '#fff1f2'; otherDz.dataset.correct = 'false';
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                        targetsDiv.appendChild(dz);
+                    });
+                    block.appendChild(termsDiv); block.appendChild(targetsDiv);
+                } else if (it.type === 'complete') {
+                    const q = document.createElement('div'); q.innerHTML = `<div class="mt-2">${escapeHtml(it.prompt || '')}</div><input class="mt-2 border rounded p-1" id="fill-${idx}">`;
+                    const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
+                    btn.addEventListener('click', ()=> {
+                        const user = document.getElementById(`fill-${idx}`).value.trim(); if (user === (it.answer || '')) {
+                            alert('✅ Correcto'); score += 4; saveScore();
+                        } else alert('❌ Incorrecto.');
+                    });
+                    block.appendChild(q); block.appendChild(btn);
+                }
+                area.appendChild(block);
+            });
+            document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+        }
+
+        /* render maps */
+        function renderMaps() {
+            const disp = document.getElementById('mapsDisplay'); disp.innerHTML = '';
+            Object.entries(DB.maps || {}).forEach(([k,
+                v])=> {
+                const div = document.createElement('div'); div.className = 'bg-gray-50 p-3 rounded';
+                div.innerHTML = `<h3 class="font-semibold capitalize">${escapeHtml(k)}</h3><pre class="map">${escapeHtml(v)}</pre>`;
+                disp.appendChild(div);
+            });
+            document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+        }
+
+        /* Save/load DB to localStorage */
+        function saveToLocal() {
+            localStorage.setItem('DB_biocel', JSON.stringify(DB));
+        }
+        function loadFromLocal() {
+            const raw = localStorage.getItem('DB_biocel');
+            if (raw) {
+                try {
+                    DB = JSON.parse(raw);
+                } catch(e) {
+                    console.error(e);
+                }
+            }
+            ensureDbShape();
+            renderAll();
+        }
+        function renderAll() {
+            ensureDbShape();
+            renderQuizTopics();
+            renderGloss(); renderFlashcards(); renderStructures(); renderCases(); renderInteratives(); renderMaps(); document.getElementById('questionsJSON').value = JSON.stringify(DB.questions || [], null, 2);
+            document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+        }
+        loadFromLocal();
+
+        /* Score and dashboard */
+        let score = Number(localStorage.getItem('score') || 0);
+        document.getElementById('score').textContent = score;
+        function saveScore() {
+            localStorage.setItem('score', score); document.getElementById('score').textContent = score;
+        }
+        function updateBlocks() {
+            document.getElementById('p1').textContent = localStorage.getItem('block1') || 'Incompleto'; document.getElementById('p2').textContent = localStorage.getItem('block2') || 'Incompleto'; document.getElementById('p3').textContent = localStorage.getItem('block3') || 'Incompleto';
+        }
+        updateBlocks();
+
+        /* Navigation wiring */
+        const sections = document.querySelectorAll("section");
+        document.querySelectorAll(".btn").forEach(btn=> {
+            btn.classList.add("px-3", "py-1", "rounded", "bg-indigo-600", "text-white"); btn.addEventListener('click', ()=> {
+                sections.forEach(sec=>sec.classList.add('hidden-by-default')); document.getElementById(btn.dataset.target).classList.remove('hidden-by-default'); window.scrollTo({
+                    top: 0, behavior: 'smooth'
+                });
+            });
+        });
+
+        /* File import/export */
+        const fileInput = document.getElementById('fileInput');
+        document.querySelector('.btn-file').addEventListener('click', ()=> fileInput.click());
+        fileInput.addEventListener('change', handleFile, false);
+        document.getElementById('exportJSON').addEventListener('click', exportAll);
+
+        function handleFile(evt) {
+            const f = evt.target.files[0];
+            if (!f) return;
+            const reader = new FileReader();
+            reader.onload = e=> {
+                try {
+                    const obj = JSON.parse(e.target.result);
+                    // basic merge/replace: if keys present replace DB keys
+                    DB = Object.assign({}, DB, obj);
+                    ensureDbShape();
+                    renderAll();
+                    saveToLocal();
+                    alert('Contenido importado correctamente.');
+                } catch(err) {
+                    alert('Error leyendo JSON: ' + err.message);
+                }
+            };
+            reader.readAsText(f);
+        }
+        function exportAll() {
+            const dataStr = JSON.stringify(DB, null, 2);
+            const blob = new Blob([dataStr], {
+                type: "application/json"
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'contenido_biologia_celular.json'; document.body.appendChild(a); a.click(); a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        /* CRUD simple for glosario, flashcards, etc. */
+        document.getElementById('addTerm').addEventListener('click', ()=> {
+            const t = document.getElementById('termInput').value.trim(); const d = document.getElementById('defInput').value.trim();
+            if (!t || !d) {
+                alert('Rellena término y definición'); return;
+            }
+            DB.glossary.unshift({
+                term: t, def: d
+            }); document.getElementById('termInput').value = ''; document.getElementById('defInput').value = ''; renderGloss(); saveToLocal();
+        });
+        document.getElementById('clearGloss').addEventListener('click', ()=> {
+            if (!confirm('Borrar todo el glosario?')) return; DB.glossary = []; renderGloss(); saveToLocal();
+        });
+        document.getElementById('importGloss').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('glossJSON').value); if (Array.isArray(arr)) {
+                    DB.glossary = arr; renderGloss(); saveToLocal(); alert('Glosario importado');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportGloss').addEventListener('click', ()=> {
+            document.getElementById('glossJSON').value = JSON.stringify(DB.glossary, null, 2);
+        });
+
+        document.getElementById('loadFlash').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('flashJSON').value); if (Array.isArray(arr)) {
+                    DB.flashcards = arr; renderFlashcards(); saveToLocal(); alert('Flashcards cargadas');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportFlash').addEventListener('click', ()=> {
+            document.getElementById('flashJSON').value = JSON.stringify(DB.flashcards, null, 2);
+        });
+
+        document.getElementById('loadStructures').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('structuresJSON').value); if (Array.isArray(arr)) {
+                    DB.structures = arr; renderStructures(); saveToLocal(); alert('Estructuras cargadas');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportStructures').addEventListener('click', ()=> {
+            document.getElementById('structuresJSON').value = JSON.stringify(DB.structures, null, 2);
+        });
+
+        document.getElementById('loadCases').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('casesJSON').value); if (Array.isArray(arr)) {
+                    DB.cases = arr; renderCases(); saveToLocal(); alert('Casos cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportCases').addEventListener('click', ()=> {
+            document.getElementById('casesJSON').value = JSON.stringify(DB.cases, null, 2);
+        });
+
+        document.getElementById('loadInter').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('interJSON').value); if (Array.isArray(arr)) {
+                    DB.interactives = arr; renderInteratives(); saveToLocal(); alert('Interactivos cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportInter').addEventListener('click', ()=> {
+            document.getElementById('interJSON').value = JSON.stringify(DB.interactives, null, 2);
+        });
+
+        document.getElementById('loadMaps').addEventListener('click', ()=> {
+            try {
+                const obj = JSON.parse(document.getElementById('mapsJSON').value); if (typeof obj === 'object') {
+                    DB.maps = obj; renderMaps(); saveToLocal(); alert('Mapas cargados');
+                } else alert('Formato inválido');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportMaps').addEventListener('click', ()=> {
+            document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
+        });
+
+        /* Quiz: sequential behavior */
+        let filteredQuestions = DB.questions.slice();
+        let qIndex = 0;
+        let currentQuestion = null;
+        function renderQuizTopics() {
+            const select = document.getElementById('quizTopic');
+            if (!select) return;
+            select.innerHTML = '';
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Todos los bloques';
+            select.appendChild(allOption);
+            const topics = Array.isArray(DB.quizTopics) ? DB.quizTopics : [];
+            topics.forEach(topic => {
+                if (!topic || !topic.value) return;
+                const option = document.createElement('option');
+                option.value = topic.value;
+                option.textContent = topic.label || topic.value;
+                select.appendChild(option);
+            });
+        }
+        function refreshFiltered(topic) {
+            filteredQuestions = (topic && topic !== 'all') ? DB.questions.filter(q=> q.topic === topic): DB.questions.slice();
+            qIndex = 0;
+            document.getElementById('qTotal').textContent = filteredQuestions.length;
+            renderCurrentQuestion();
+        }
+        function renderCurrentQuestion() {
+            if (filteredQuestions.length === 0) {
+                document.getElementById('qText').textContent = 'No hay preguntas en este tema.'; document.getElementById('qOptions').innerHTML = ''; document.getElementById('qNumber').textContent = '0'; return;
+            }
+            if (qIndex < 0) qIndex = 0;
+            if (qIndex >= filteredQuestions.length) qIndex = filteredQuestions.length -1;
+            const q = filteredQuestions[qIndex];
+            document.getElementById('qText').textContent = q.text;
+            const opts = document.getElementById('qOptions'); opts.innerHTML = '';
+            const questionOptions = Array.isArray(q.options) ? q.options : [];
+            questionOptions.forEach((o, i)=> {
+                const label = document.createElement('label'); label.className = 'block'; label.innerHTML = `<input type="radio" name="qopt" value="${i}"> ${escapeHtml(o)}`; opts.appendChild(label);
+            });
+            document.getElementById('qNumber').textContent = (qIndex+1);
+            document.getElementById('qTotal').textContent = filteredQuestions.length;
+            currentQuestion = q;
+        }
+        document.getElementById('quizTopic').addEventListener('change', ()=> {
+            refreshFiltered(document.getElementById('quizTopic').value);
+        });
+        document.getElementById('nextQ').addEventListener('click', ()=> {
+            if (filteredQuestions.length === 0) {
+                alert('No hay preguntas.'); return;
+            } if (qIndex < filteredQuestions.length-1) qIndex++; renderCurrentQuestion();
+        });
+        document.getElementById('prevQ').addEventListener('click', ()=> {
+            if (filteredQuestions.length === 0) {
+                alert('No hay preguntas.'); return;
+            } if (qIndex > 0) qIndex--; renderCurrentQuestion();
+        });
+        document.getElementById('checkA').addEventListener('click', ()=> {
+            const sel = document.querySelector('input[name="qopt"]:checked'); const res = document.getElementById('qResult'); if (!currentQuestion) {
+                res.textContent = 'No hay pregunta seleccionada.'; return;
+            } if (!sel) {
+                res.textContent = 'Selecciona una opción.'; return;
+            } if (parseInt(sel.value) === currentQuestion.answer) {
+                res.textContent = '✅ Correcto. ' + (currentQuestion.explain || ''); score += 10; saveScore();
+            } else res.textContent = '❌ Incorrecto. ' + (currentQuestion.explain || '');
+        });
+
+        document.getElementById('showAll').addEventListener('click', ()=> {
+            document.getElementById('questionsJSON').value = JSON.stringify(DB.questions, null, 2);
+        });
+
+        /* Load questions JSON editor */
+        document.getElementById('loadQuestions').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('questionsJSON').value); if (Array.isArray(arr)) {
+                    DB.questions = arr; refreshFiltered(document.getElementById('quizTopic').value); renderAll(); saveToLocal(); alert('Preguntas cargadas');
+                } else alert('Formato inválido (se espera array).');
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('loadQuizTopics').addEventListener('click', ()=> {
+            try {
+                const arr = JSON.parse(document.getElementById('quizTopicsJSON').value);
+                if (Array.isArray(arr)) {
+                    DB.quizTopics = arr;
+                    renderQuizTopics();
+                    refreshFiltered(document.getElementById('quizTopic').value);
+                    saveToLocal();
+                    alert('Bloques del quiz cargados');
+                } else {
+                    alert('Formato inválido (se espera array).');
+                }
+            } catch(e) {
+                alert('JSON inválido');
+            }
+        });
+        document.getElementById('exportQuizTopics').addEventListener('click', ()=> {
+            document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+        });
+
+        /* Reset progress */
+        document.getElementById('reset').addEventListener('click', ()=> {
+            if (!confirm('Reiniciar todo el progreso?')) return; localStorage.clear(); score = 0; document.getElementById('score').textContent = 0; updateBlocks(); loadFromLocal(); location.reload();
+        });
+
+        /* initial render and quiz setup */
+        renderAll();
+        refreshFiltered('all');
+
+/* =====================
+   HOME JSON (SOLO INICIO)
+   ===================== */
+
+document.getElementById("loadHomeJSON").addEventListener("click", () => {
+    try {
+        const data = JSON.parse(document.getElementById("homeJSON").value);
+
+        if (data.title) {
+            document.getElementById("homeTitle").textContent = data.title;
+        }
+        if (data.description) {
+            document.getElementById("homeDescription").innerHTML = data.description;
+        }
+    } catch (e) {
+        alert("JSON inválido en Inicio");
+    }
+});
+
+document.getElementById("exportHomeJSON").addEventListener("click", () => {
+    const data = {
+        title: document.getElementById("homeTitle").textContent,
+        description: document.getElementById("homeDescription").innerHTML
+    };
+    document.getElementById("homeJSON").value = JSON.stringify(data, null, 2);
+});
+    </script>
+</body>
+</html>
