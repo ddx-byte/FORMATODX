@@ -862,8 +862,6 @@ block.appendChild(checkBtn);
 
     updateDashboard();
 }
-        loadFromLocal();
-
         /* Score and dashboard */
         const POINTS_PER_ITEM = 10;
 
@@ -965,7 +963,9 @@ function updateDashboard() {
     document.getElementById('progressInteractive').textContent = interactive.text;
     document.getElementById('progressMaps').textContent = maps.text;
 }
-
+        
+        loadFromLocal();
+        
         /* Navigation wiring */
         const sections = document.querySelectorAll("section");
         document.querySelectorAll(".btn").forEach(btn=> {
