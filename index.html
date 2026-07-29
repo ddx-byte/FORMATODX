@@ -77,6 +77,31 @@
             text-decoration: underline;
             cursor: pointer;
         }
+        .self-check-actions {
+            position: absolute;
+            right: 0.5rem;
+            bottom: 0.5rem;
+            display: flex;
+            gap: 0.25rem;
+            z-index: 2;
+        }
+        .self-check-btn {
+            border: 1px solid rgba(148, 163, 184, 0.7);
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.92);
+            font-size: 0.72rem;
+            line-height: 1;
+            padding: 0.18rem 0.3rem;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+        }
+        .self-check-btn.selected-correct {
+            background: #dcfce7;
+            border-color: #16a34a;
+        }
+        .self-check-btn.selected-incorrect {
+            background: #fee2e2;
+            border-color: #dc2626;
+        }
     </style>
 </head>
 
@@ -297,18 +322,18 @@
         <!-- Dashboard -->
         <section id="dash" class="hidden-by-default bg-white p-5 rounded shadow">
             <h2 class="text-lg font-semibold mb-2">Dashboard de progreso</h2>
-            <p class="text-sm">
-                Puntaje total: <span id="score">0</span>
-            </p>
+            <div class="text-sm space-y-1">
+                <p>Puntaje total: <span id="score" class="font-semibold">0</span> / <span id="maxScore" class="font-semibold">0</span></p>
+                <p>Porcentaje global: <span id="scorePercent" class="font-semibold text-indigo-600">0%</span></p>
+                <div class="w-full bg-gray-200 rounded h-3 mt-2">
+                    <div id="scoreBar" class="bg-indigo-600 h-3 rounded" style="width:0%"></div>
+                </div>
+            </div>
             <button id="reset" class="mt-2 px-3 py-1 bg-red-500 text-white rounded">Reiniciar progreso</button>
 
             <div class="mt-4">
-                <h3 class="font-semibold">Progreso por bloque</h3>
-                <ul class="list-disc ml-6 text-sm">
-                    <li>1) Endomembrana: <span id="p1" class="font-semibold text-blue-600">Incompleto</span></li>
-                    <li>2) Estructuras y Procesos: <span id="p2" class="font-semibold text-green-600">Incompleto</span></li>
-                    <li>3) Mitocondrias y Metabolismo: <span id="p3" class="font-semibold text-red-600">Incompleto</span></li>
-                </ul>
+                <h3 class="font-semibold">Progreso por sección</h3>
+                <ul id="sectionProgress" class="list-disc ml-6 text-sm space-y-1"></ul>
             </div>
         </section>
     </div>
@@ -464,6 +489,40 @@
             if (!s) return ''; return String(s).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
         }
 
+
+        function createSelfCheckControls(section, id) {
+            const actions = document.createElement('div');
+            actions.className = 'self-check-actions';
+            const correct = document.createElement('button');
+            correct.type = 'button';
+            correct.className = 'self-check-btn';
+            correct.textContent = '✅';
+            correct.title = 'Marcar como correcto';
+            const incorrect = document.createElement('button');
+            incorrect.type = 'button';
+            incorrect.className = 'self-check-btn';
+            incorrect.textContent = '❌';
+            incorrect.title = 'Marcar como incorrecto';
+            function refresh() {
+                correct.classList.toggle('selected-correct', progress[getItemKey(section, id)] === 'correct');
+                incorrect.classList.toggle('selected-incorrect', progress[getItemKey(section, id)] === 'incorrect');
+            }
+            correct.addEventListener('click', event => {
+                event.stopPropagation();
+                awardItem(section, id);
+                refresh();
+            });
+            incorrect.addEventListener('click', event => {
+                event.stopPropagation();
+                markItemIncorrect(section, id);
+                refresh();
+            });
+            actions.appendChild(correct);
+            actions.appendChild(incorrect);
+            refresh();
+            return actions;
+        }
+
         /* render glossary */
         function renderGloss() {
             const list = document.getElementById('glossList'); list.innerHTML = '';
@@ -476,12 +535,13 @@
                     return !query || term.includes(query) || def.includes(query);
                 })
                 .forEach((g, idx)=> {
-                    const div = document.createElement('div'); div.className = 'p-2 border-b';
+                    const div = document.createElement('div'); div.className = 'relative p-2 pr-16 border-b';
                     div.innerHTML = `<strong>${escapeHtml(g.term)}</strong><p class="text-xs text-gray-700">${escapeHtml(g.def)}</p>
-                <button data-i="${idx}" class="text-blue-600 text-xs mt-1">Editar</button>`;
+                <button data-i="${idx}" class="edit-gloss text-blue-600 text-xs mt-1">Editar</button>`;
+                    div.appendChild(createSelfCheckControls('gloss', getItemId(g, idx)));
                     list.appendChild(div);
                 });
-            list.querySelectorAll('button').forEach(btn=> {
+            list.querySelectorAll('.edit-gloss').forEach(btn=> {
                 btn.addEventListener('click', ()=> {
                     const i = parseInt(btn.dataset.i);
                     document.getElementById('termInput').value = DB.glossary[i].term || '';
@@ -502,6 +562,8 @@
             flashcards.forEach((f, i)=> {
                 const card = document.createElement('div'); card.className = 'card'; card.style.width = '240px';
                 card.innerHTML = `<div class="card-inner" data-index="${i}"><div class="card-front">${escapeHtml(f.front)}</div><div class="card-back">${escapeHtml(f.back)}</div></div>`;
+                card.style.position = 'relative';
+                card.appendChild(createSelfCheckControls('flash', getItemId(f, i)));
                 card.querySelector('.card-inner').addEventListener('click', e=> {
                     const inner = e.currentTarget; inner.style.transform = inner.style.transform ? '': 'rotateY(180deg)';
                 });
@@ -528,7 +590,7 @@
                     const sel = wrap.querySelector(`input[name="struct_${idx}"]:checked`); if (!sel) {
                         alert('Selecciona opción'); return;
                     } if (parseInt(sel.value) === s.answer) {
-                        alert('✅ Correcto\n'+(s.explain || '')); score += 5; saveScore();
+                        alert('✅ Correcto\n'+(s.explain || '')); awardItem('estructuras', getItemId(s, idx));
                     } else alert('❌ Incorrecto\n'+(s.explain || ''));
                 });
                 wrap.appendChild(btn);
@@ -556,7 +618,7 @@
                         const sel = wrap.querySelector(`input[name="case_${idx}"]:checked`); if (!sel) {
                             alert('Selecciona opción'); return;
                         } if (parseInt(sel.value) === c.answer) {
-                            alert('✅ Correcto\n'+(c.feedback || '')); score += 8; saveScore(); localStorage.setItem('block1', 'Completado'); updateBlocks();
+                            alert('✅ Correcto\n'+(c.feedback || '')); awardItem('casos', getItemId(c, idx));
                         } else {
                             alert('❌ Incorrecto\n'+(c.feedback || ''));
                         }
@@ -611,7 +673,7 @@
                             const expected = normalizeText((it.answerMap && it.answerMap[childText]) ? it.answerMap[childText]: '');
                             const zoneText = normalizeText(dz.dataset.target || label.textContent || '');
                             if (expected && expected === zoneText) {
-                                dz.style.borderColor = '#16a34a'; dz.style.backgroundColor = '#ecfdf5'; dz.dataset.correct = 'true'; score += 3; saveScore();
+                                dz.style.borderColor = '#16a34a'; dz.style.backgroundColor = '#ecfdf5'; dz.dataset.correct = 'true'; awardItem('interactivo', `${getItemId(it, idx)}:${childText}`);
                             } else {
                                 dz.style.borderColor = '#dc2626'; dz.style.backgroundColor = '#fff1f2'; dz.dataset.correct = 'false';
                             }
@@ -650,7 +712,7 @@
                     const btn = document.createElement('button'); btn.className = 'mt-2 px-2 py-1 bg-amber-500 text-white rounded'; btn.textContent = 'Verificar';
                     btn.addEventListener('click', ()=> {
                         const user = document.getElementById(`fill-${idx}`).value.trim(); if (user === (it.answer || '')) {
-                            alert('✅ Correcto'); score += 4; saveScore();
+                            alert('✅ Correcto'); awardItem('interactivo', getItemId(it, idx));
                         } else alert('❌ Incorrecto.');
                     });
                     block.appendChild(q); block.appendChild(btn);
@@ -665,8 +727,9 @@
             const disp = document.getElementById('mapsDisplay'); disp.innerHTML = '';
             Object.entries(DB.maps || {}).forEach(([k,
                 v])=> {
-                const div = document.createElement('div'); div.className = 'bg-gray-50 p-3 rounded';
+                const div = document.createElement('div'); div.className = 'relative bg-gray-50 p-3 pr-16 rounded';
                 div.innerHTML = `<h3 class="font-semibold capitalize">${escapeHtml(k)}</h3><pre class="map">${escapeHtml(v)}</pre>`;
+                div.appendChild(createSelfCheckControls('map', k));
                 disp.appendChild(div);
             });
             document.getElementById('mapsJSON').value = JSON.stringify(DB.maps || {}, null, 2);
@@ -693,19 +756,98 @@
             renderQuizTopics();
             renderGloss(); renderFlashcards(); renderStructures(); renderCases(); renderInteratives(); renderMaps(); document.getElementById('questionsJSON').value = JSON.stringify(DB.questions || [], null, 2);
             document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+            if (typeof updateDashboard === 'function') updateDashboard();
         }
-        loadFromLocal();
-
         /* Score and dashboard */
-        let score = Number(localStorage.getItem('score') || 0);
-        document.getElementById('score').textContent = score;
+        const SCORE_RULES = {
+            quiz: { label: 'Quiz', points: 10 },
+            gloss: { label: 'Glosario', points: 1 },
+            flash: { label: 'Flashcards', points: 1 },
+            estructuras: { label: 'Estructuras', points: 5 },
+            casos: { label: 'Casos', points: 8 },
+            interactivo: { label: 'Interactivo', points: 4 },
+            map: { label: 'Mapas', points: 1 }
+        };
+        let progress = loadProgress();
+        let score = 0;
+
+        function loadProgress() {
+            try {
+                return JSON.parse(localStorage.getItem('progress_v2') || '{}') || {};
+            } catch(e) {
+                return {};
+            }
+        }
+        function saveProgress() {
+            localStorage.setItem('progress_v2', JSON.stringify(progress));
+        }
+        function getItemKey(section, id) {
+            return `${section}:${id}`;
+        }
+        function getItemId(item, fallback) {
+            return String((item && (item.id || item.term || item.front || item.title)) || fallback);
+        }
+        function isCompleted(section, id) {
+            return progress[getItemKey(section, id)] === 'correct';
+        }
+        function setItemProgress(section, id, status) {
+            progress[getItemKey(section, id)] = status;
+            saveProgress();
+            updateDashboard();
+        }
+        function awardItem(section, id) {
+            setItemProgress(section, id, 'correct');
+        }
+        function markItemIncorrect(section, id) {
+            setItemProgress(section, id, 'incorrect');
+        }
+        function getSectionItems() {
+            const dragdropCount = (Array.isArray(DB.interactives) ? DB.interactives : []).reduce((total, it) => {
+                if (it.type === 'dragdrop') return total + (Array.isArray(it.terms) ? it.terms.length : 0);
+                return total + 1;
+            }, 0);
+            return {
+                quiz: (Array.isArray(DB.questions) ? DB.questions : []).length,
+                gloss: (Array.isArray(DB.glossary) ? DB.glossary : []).length,
+                flash: (Array.isArray(DB.flashcards) ? DB.flashcards : []).length,
+                estructuras: (Array.isArray(DB.structures) ? DB.structures : []).length,
+                casos: (Array.isArray(DB.cases) ? DB.cases : []).length,
+                interactivo: dragdropCount,
+                map: Object.keys(DB.maps || {}).length
+            };
+        }
+        function getSectionScore(section) {
+            const prefix = `${section}:`;
+            return Object.entries(progress).filter(([key, status]) => key.startsWith(prefix) && status === 'correct').length * SCORE_RULES[section].points;
+        }
+        function updateDashboard() {
+            const counts = getSectionItems();
+            score = Object.keys(SCORE_RULES).reduce((sum, section) => sum + getSectionScore(section), 0);
+            const maxScore = Object.entries(counts).reduce((sum, [section, count]) => sum + count * SCORE_RULES[section].points, 0);
+            const percent = maxScore ? Math.round((score / maxScore) * 100) : 0;
+            document.getElementById('score').textContent = score;
+            document.getElementById('maxScore').textContent = maxScore;
+            document.getElementById('scorePercent').textContent = `${percent}%`;
+            document.getElementById('scoreBar').style.width = `${Math.min(percent, 100)}%`;
+            const list = document.getElementById('sectionProgress');
+            list.innerHTML = '';
+            Object.entries(SCORE_RULES).forEach(([section, rule]) => {
+                const sectionMax = counts[section] * rule.points;
+                const sectionScore = getSectionScore(section);
+                const sectionPercent = sectionMax ? Math.round((sectionScore / sectionMax) * 100) : 0;
+                const li = document.createElement('li');
+                li.innerHTML = `${rule.label}: <span class="font-semibold text-indigo-600">${sectionScore}/${sectionMax} (${sectionPercent}%)</span>`;
+                list.appendChild(li);
+            });
+        }
         function saveScore() {
-            localStorage.setItem('score', score); document.getElementById('score').textContent = score;
+            updateDashboard();
         }
         function updateBlocks() {
-            document.getElementById('p1').textContent = localStorage.getItem('block1') || 'Incompleto'; document.getElementById('p2').textContent = localStorage.getItem('block2') || 'Incompleto'; document.getElementById('p3').textContent = localStorage.getItem('block3') || 'Incompleto';
+            updateDashboard();
         }
-        updateBlocks();
+        updateDashboard();
+        loadFromLocal();
 
         /* Navigation wiring */
         const sections = document.querySelectorAll("section");
@@ -906,7 +1048,7 @@
             } if (!sel) {
                 res.textContent = 'Selecciona una opción.'; return;
             } if (parseInt(sel.value) === currentQuestion.answer) {
-                res.textContent = '✅ Correcto. ' + (currentQuestion.explain || ''); score += 10; saveScore();
+                res.textContent = '✅ Correcto. ' + (currentQuestion.explain || ''); awardItem('quiz', getItemId(currentQuestion, qIndex));
             } else res.textContent = '❌ Incorrecto. ' + (currentQuestion.explain || '');
         });
 
@@ -942,6 +1084,7 @@
         });
         document.getElementById('exportQuizTopics').addEventListener('click', ()=> {
             document.getElementById('quizTopicsJSON').value = JSON.stringify(DB.quizTopics || [], null, 2);
+            if (typeof updateDashboard === 'function') updateDashboard();
         });
 
         /* Reset progress */
